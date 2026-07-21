@@ -1,0 +1,59 @@
+{
+  "name": "@planoda/cli",
+  "version": "0.1.0",
+  "description": "Command-line client for Planoda — AI-triage a backlog, create & list issues from your terminal or CI. The AI-native alternative to Linear, ClickUp, Monday & Trello.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "planoda": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "planoda",
+    "cli",
+    "project-management",
+    "issue-tracker",
+    "task-management",
+    "ai",
+    "ai-triage",
+    "backlog",
+    "linear-alternative",
+    "clickup-alternative",
+    "jira-alternative",
+    "monday-alternative",
+    "trello-alternative",
+    "devtools",
+    "command-line"
+  ],
+  "homepage": "https://planoda.com/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/planoda/cli.git"
+  },
+  "bugs": {
+    "url": "https://planoda.com/support"
+  },
+  "author": "Planoda <hello@planoda.com> (https://planoda.com)",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.4"
+  }
+}
