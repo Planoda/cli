@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-          cache: npm
+      # No `cache: npm` — these packages intentionally ship without a lockfile.
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck --if-present
       - run: npm test --if-present
