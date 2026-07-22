@@ -1,6 +1,6 @@
 {
   "name": "@planoda/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Command-line client for Planoda — AI-triage a backlog, create & list issues from your terminal or CI. The AI-native alternative to Linear, ClickUp, Monday & Trello.",
   "license": "MIT",
   "type": "module",

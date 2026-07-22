@@ -15,7 +15,7 @@
 
 import { fileURLToPath } from "node:url";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 const DEFAULT_ORIGIN = "https://planoda.com";
 
 export interface Ctx {
