@@ -41,7 +41,7 @@
   "homepage": "https://planoda.com/developers",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/planoda/cli.git"
+    "url": "git+https://github.com/Planoda/cli.git"
   },
   "bugs": {
     "url": "https://planoda.com/support"
@@ -51,9 +51,9 @@
     "access": "public"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.0",
-    "vitest": "^3.2.4"
+    "@types/node": "^26.1.1",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }

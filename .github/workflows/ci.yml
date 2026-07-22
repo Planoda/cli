@@ -1,0 +1,33 @@
+# Canonical CI for the public @planoda/* packages (sdk, cli, mcp-server, templates).
+# Source of truth lives in the monorepo at scripts/oss/workflows/ci.yml and is
+# mirrored into each public repo's .github/workflows/ by scripts/oss/mirror.mjs.
+# Uses --if-present so a package that lacks a given script (e.g. templates has no
+# build/test) is a no-op rather than a failure.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck --if-present
+      - run: npm test --if-present
+      - run: npm run build --if-present

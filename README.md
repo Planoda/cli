@@ -48,7 +48,7 @@ npm i -g @planoda/cli
 Create an API key in Planoda under **Settings → API keys**, then:
 
 ```bash
-export PLANODA_API_KEY=pk_...
+export PLANODA_API_KEY=ttm_...
 
 planoda whoami
 planoda issue create --team <teamId> --title "Ship the CLI" --priority 2

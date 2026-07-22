@@ -131,4 +131,66 @@ describe("@planoda/cli — 429 rate-limit formatting", () => {
     await expect(call).rejects.toBeInstanceOf(CliError);
     await expect(call).rejects.toMatchObject({ message: "500 boom" });
   });
+
+  it("reads the IETF `RateLimit-Limit` header the /api/v1 REST API emits", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        response(
+          429,
+          { code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded" },
+          { "retry-after": "12", "ratelimit-limit": "240" }
+        )
+      )
+    );
+    const err: unknown = await api(ctx(), "GET", "/api/v1/issues", undefined, {
+      auth: false,
+    }).catch((e) => e);
+    expect((err as CliError).message).toBe(
+      "rate limited — the free demo endpoint allows 240 requests/min. Retry in 12s, or set PLANODA_API_KEY for higher limits."
+    );
+  });
+});
+
+describe("@planoda/cli — error-message extraction", () => {
+  it("surfaces the tRPC-shaped `message` field the /api/v1 REST API returns", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        response(401, {
+          code: "UNAUTHORIZED",
+          message: "Missing or malformed Authorization header",
+          data: { code: "UNAUTHORIZED", httpStatus: 401 },
+        })
+      )
+    );
+    const call = api(ctx(), "GET", "/api/v1/users/me", undefined, {
+      auth: false,
+    });
+    await expect(call).rejects.toMatchObject({
+      message: "401 Missing or malformed Authorization header",
+    });
+  });
+
+  it("falls back to `error`, then to statusText, for other shapes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response(404, { error: "not_found" }))
+    );
+    await expect(
+      api(ctx(), "GET", "/api/v1/issues/x", undefined, { auth: false })
+    ).rejects.toMatchObject({ message: "404 not_found" });
+
+    // Empty body → parsed is null → fall back to the Response statusText.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("", { status: 403, statusText: "Forbidden" })
+      )
+    );
+    await expect(
+      api(ctx(), "GET", "/api/v1/issues", undefined, { auth: false })
+    ).rejects.toMatchObject({ message: "403 Forbidden" });
+  });
 });

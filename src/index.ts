@@ -84,7 +84,7 @@ function parseRetryAfterSeconds(raw: string | null): number | undefined {
   return;
 }
 
-/** Parse `x-ratelimit-limit` into a display string, or `undefined` if absent/garbage. */
+/** Parse a rate-limit-limit header value into a display string, or `undefined` if absent/garbage. */
 function parseRateLimitHeader(raw: string | null): string | undefined {
   if (!raw) {
     return;
@@ -97,13 +97,21 @@ function parseRateLimitHeader(raw: string | null): string | undefined {
 }
 
 /**
- * Build the human, actionable message for a 429 from the free demo endpoint.
- * The server-side limit is deliberately NOT hard-coded here (it changes —
- * see `src/lib/rate-limit.ts`); both the limit and retry-after clauses are
- * read from response headers and gracefully omitted when absent.
+ * Build the human, actionable message for a 429.
+ *
+ * The server-side limit is deliberately NOT hard-coded here (it changes — see
+ * `src/lib/rate-limit.ts`); both the limit and retry-after clauses are read
+ * from response headers and gracefully omitted when absent. Two endpoint
+ * families use different header namings, so we accept both:
+ *   • the public demo (`/api/public/ai/triage`) sends legacy `X-RateLimit-*`
+ *     plus `Retry-After`;
+ *   • the versioned REST API (`/api/v1/**`) sends IETF-draft `RateLimit-*`.
+ * Header lookups are case-insensitive; we try the IETF name first, then legacy.
  */
 function buildRateLimitMessage(res: Response): string {
-  const limit = parseRateLimitHeader(res.headers.get("x-ratelimit-limit"));
+  const limit =
+    parseRateLimitHeader(res.headers.get("ratelimit-limit")) ??
+    parseRateLimitHeader(res.headers.get("x-ratelimit-limit"));
   const retryAfterSeconds = parseRetryAfterSeconds(
     res.headers.get("retry-after")
   );
@@ -167,14 +175,34 @@ export async function api(
     if (res.status === 429) {
       throw new CliError(buildRateLimitMessage(res));
     }
-    const errMsg =
-      (parsed &&
-        typeof parsed === "object" &&
-        (parsed as Record<string, unknown>).error) ||
-      res.statusText;
-    throw new CliError(`${res.status} ${String(errMsg)}`);
+    const errMsg = extractErrorMessage(parsed) ?? res.statusText;
+    throw new CliError(`${res.status} ${errMsg}`);
   }
   return parsed;
+}
+
+/**
+ * Pull a human-readable message out of an API error body. Two shapes exist:
+ *   • the public demo endpoint returns `{ error: "rate_limited" }`;
+ *   • the versioned REST API (`/api/v1/**`) returns tRPC-shaped
+ *     `{ code, message, data }`.
+ * Prefer the richest field (`message`), then `error`, then `code`; fall back to
+ * a bare string body. Returns `undefined` so the caller can use `statusText`.
+ */
+function extractErrorMessage(parsed: unknown): string | undefined {
+  if (typeof parsed === "string" && parsed.length > 0) {
+    return parsed;
+  }
+  if (parsed && typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    for (const key of ["message", "error", "code"] as const) {
+      const v = o[key];
+      if (typeof v === "string" && v.length > 0) {
+        return v;
+      }
+    }
+  }
+  return undefined;
 }
 
 /** Unwrap the `{ data }` envelope the REST API wraps single resources in. */
@@ -348,7 +376,7 @@ EXAMPLES
   npx @planoda/cli triage "Fix the flaky login test" "Add dark mode" "Typo in footer"
   cat backlog.txt | planoda triage -
   planoda issue create --team <teamId> --title "Ship the CLI" --priority 2
-  PLANODA_API_KEY=pk_... planoda issue list --limit 10 --json
+  PLANODA_API_KEY=ttm_... planoda issue list --limit 10 --json
 `;
 
 async function main(): Promise<void> {

@@ -1,0 +1,47 @@
+# Canonical tag-driven npm publish for the public @planoda/* packages.
+# Source of truth: monorepo scripts/oss/workflows/publish.yml → mirrored into each
+# public repo's .github/workflows/ by scripts/oss/mirror.mjs.
+#
+# Trigger: push a semver tag (e.g. `v0.1.2`). The job rebuilds + tests from a clean
+# checkout, then publishes to npm WITH PROVENANCE (a signed, verifiable link from the
+# tarball back to this workflow run) under the @planoda scope.
+#
+# Requires ONE repo/org secret: NPM_TOKEN — an npm *automation* token for an account
+# that owns the @planoda scope (ideally the `planoda` npm org). Provenance additionally
+# needs `id-token: write` (below) and npm >= 9.5 (bundled with Node 20+).
+name: publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck --if-present
+      - run: npm test --if-present
+      - run: npm run build --if-present
+      # Fail loudly if the tag (v0.1.2) doesn't match package.json's version (0.1.2).
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v$TAG != package.json version $PKG"; exit 1
+          fi
+      - name: Publish to npm (with provenance)
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
