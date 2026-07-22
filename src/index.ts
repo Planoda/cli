@@ -13,9 +13,10 @@
  * flag parser. Bundled to a single file so `npx @planoda/cli` is instant.
  */
 
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const VERSION = "0.1.1";
+const VERSION = "0.1.2";
 const DEFAULT_ORIGIN = "https://planoda.com";
 
 export interface Ctx {
@@ -430,9 +431,38 @@ async function main(): Promise<void> {
   void rest;
 }
 
-// Only run when invoked directly (`node dist/index.js`, `npx @planoda/cli`) —
-// not when imported, e.g. by the unit tests in `index.test.ts`.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+/**
+ * True when this module is the process entry point.
+ *
+ * `process.argv[1]` is the path Node was *given*. For a package `bin`, npm
+ * installs a SYMLINK (`node_modules/.bin/planoda` → `../@planoda/cli/dist/index.js`),
+ * so argv[1] is that symlink while `import.meta.url` resolves to the real file.
+ * Comparing them raw is therefore ALWAYS false under `npx @planoda/cli` and a
+ * globally-installed `planoda` — which silently skipped `main()` and made the
+ * CLI a no-op (exit 0, no output). Resolve both to real paths before comparing.
+ *
+ * Exported so the behaviour is unit-testable without spawning a process.
+ */
+export function isDirectRun(
+  argv1: string | undefined,
+  moduleUrl: string
+): boolean {
+  if (!argv1) {
+    return false;
+  }
+  const resolve = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  return resolve(argv1) === resolve(fileURLToPath(moduleUrl));
+}
+
+// Only run when invoked directly (`node dist/index.js`, `npx @planoda/cli`,
+// global `planoda`) — not when imported, e.g. by `index.test.ts`.
+if (isDirectRun(process.argv[1], import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(
       `planoda: unexpected error: ${(err as Error).message}\n`

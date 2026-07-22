@@ -41,7 +41,30 @@ jobs:
           if [ "$TAG" != "$PKG" ]; then
             echo "::error::tag v$TAG != package.json version $PKG"; exit 1
           fi
+      # Idempotency: a version already on npm can never be re-published, so a
+      # re-run (or a manual publish that already happened) must be a SKIP, not a
+      # red build. `npm view` needs no auth for a public package.
+      - name: Skip if this version is already on npm
+        id: published
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VER="$(node -p "require('./package.json').version")"
+          if npm view "$NAME@$VER" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$NAME@$VER is already published — skipping."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Fail clearly when NPM_TOKEN is missing
+        if: steps.published.outputs.already == 'false' && env.NPM_TOKEN == ''
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "::error::NPM_TOKEN secret is not set on this repo/org, so npm publish cannot authenticate."
+          echo "Create an npm *automation* token and add it: gh secret set NPM_TOKEN --repo ${{ github.repository }}"
+          exit 1
       - name: Publish to npm (with provenance)
+        if: steps.published.outputs.already == 'false'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

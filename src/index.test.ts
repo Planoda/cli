@@ -10,8 +10,12 @@
  * of `index.ts`), so importing `api`/`CliError` here is side-effect-free.
  */
 
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, CliError, type Ctx } from "./index.js";
+import { api, CliError, type Ctx, isDirectRun } from "./index.js";
 
 function response(
   status: number,
@@ -149,6 +153,33 @@ describe("@planoda/cli — 429 rate-limit formatting", () => {
     expect((err as CliError).message).toBe(
       "rate limited — the free demo endpoint allows 240 requests/min. Retry in 12s, or set PLANODA_API_KEY for higher limits."
     );
+  });
+});
+
+describe("@planoda/cli — entry-point detection (npx / global bin)", () => {
+  // Regression: npm installs a package `bin` as a SYMLINK, so process.argv[1] is
+  // `node_modules/.bin/planoda` while import.meta.url is the real dist file. A raw
+  // `===` made every `npx @planoda/cli` run a silent no-op (exit 0, no output).
+  it("treats a symlinked bin (the npx path) as a direct run", () => {
+    const dir = mkdtempSync(join(tmpdir(), "planoda-cli-bin-"));
+    const real = join(dir, "index.js");
+    const link = join(dir, "planoda-link");
+    writeFileSync(real, "// entry\n");
+    symlinkSync(real, link);
+
+    expect(isDirectRun(link, pathToFileURL(real).href)).toBe(true);
+    expect(isDirectRun(real, pathToFileURL(real).href)).toBe(true);
+  });
+
+  it("is false when imported (argv[1] is a different script) or missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "planoda-cli-bin-"));
+    const real = join(dir, "index.js");
+    const other = join(dir, "vitest-entry.js");
+    writeFileSync(real, "// entry\n");
+    writeFileSync(other, "// some other runner\n");
+
+    expect(isDirectRun(other, pathToFileURL(real).href)).toBe(false);
+    expect(isDirectRun(undefined, pathToFileURL(real).href)).toBe(false);
   });
 });
 
